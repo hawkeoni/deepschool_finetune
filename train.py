@@ -1,8 +1,9 @@
 import sys
 from functools import partial
 
+import torch
 from datasets import load_dataset
-from transformers import AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 from peft import LoraConfig
 
@@ -20,12 +21,13 @@ def dataset_preproc(tokenizer, sample):
 
 # Создаем датасет и определяем функцию, которая объединит вопрос и ответ в нужном формате
 model_name = sys.argv[1]
+model = AutoModelForCausalLM.from_pretrained(model_name, use_cache=False, torch_dtype=torch.bfloat16).cuda()
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 dataset_preproc_with_tokenizer = partial(dataset_preproc, tokenizer=tokenizer)
 
 # Добавляем в датасет колонку text, на которой и будем учиться
 dataset = load_dataset("json", data_files={"train": "mailru_qa_dataset.jsonl"})
-dataset = dataset.map(dataset_preproc_with_tokenizer)
+dataset = dataset.map(lambda x: dataset_preproc_with_tokenizer(sample=x))
 
 # Учить будем только Lora добавку ко всем линейным слоям
 peft_config = LoraConfig(
@@ -41,22 +43,24 @@ peft_config = LoraConfig(
 sft_config = SFTConfig(
     dataset_text_field="text",
     max_seq_length=300,
-    output_dir="./models",
-)
-trainer = SFTTrainer(
-    model=model_name,
-    train_dataset=dataset,
-    eval_dataset=None,
-    args=sft_config,
-    peft_config=peft_config,
-    max_seq_length=300,
+    output_dir="./training_checkpoints",
+    logging_strategy="steps",
+    logging_steps=10,
     num_train_epochs=1,
     learning_rate=2e-5,
-    gradient_accumulation_steps=8,
-    per_gpu_train_batch_size=4,
+    gradient_accumulation_steps=4,
+    per_gpu_train_batch_size=8,
     save_strategy="steps",
     save_steps=100,
     gradient_checkpointing=True,
 )
-# Вызываем обучение
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=dataset["train"],
+    eval_dataset=None,
+    args=sft_config,
+    peft_config=peft_config,
+)
+print("Started training")
 trainer.train()
+print("Finished training")
