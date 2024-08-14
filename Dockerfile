@@ -1,3 +1,2 @@
 FROM pytorch/pytorch:2.4.0-cuda11.8-cudnn9-runtime
-RUN pip install transformers==4.43.0 tokenizers==0.19.1 trl==0.9.6
-
+RUN pip install transformers==4.43.0 tokenizers==0.19.1 trl==0.9.6 datasets==2.16.1 peft==0.12.0
