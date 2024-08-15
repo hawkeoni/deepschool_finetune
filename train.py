@@ -7,21 +7,26 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 from peft import LoraConfig
 
+
 def dataset_preproc(tokenizer, sample):
     messages = [
         {"role": "user", "content": sample["question"]},
-        {"role": "assistant", "content": sample["answer"]}
+        {"role": "assistant", "content": sample["answer"]},
     ]
-    return {"text": tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=False,
+    return {
+        "text": tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=False,
         )
     }
 
+
 # Создаем датасет и определяем функцию, которая объединит вопрос и ответ в нужном формате
 model_name = sys.argv[1]
-model = AutoModelForCausalLM.from_pretrained(model_name, use_cache=False, torch_dtype=torch.bfloat16).cuda()
+model = AutoModelForCausalLM.from_pretrained(
+    model_name, use_cache=False, torch_dtype=torch.bfloat16
+).cuda()
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 dataset_preproc_with_tokenizer = partial(dataset_preproc, tokenizer=tokenizer)
 
@@ -36,7 +41,7 @@ peft_config = LoraConfig(
     lora_dropout=0.05,
     bias="none",
     task_type="CAUSAL_LM",
-    target_modules="all-linear"
+    target_modules="all-linear",
 )
 
 # Определяем параметры обучения
